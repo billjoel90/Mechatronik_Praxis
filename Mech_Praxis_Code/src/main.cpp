@@ -2,6 +2,7 @@
 #include "config.h"
 #include "sensors.h"
 #include "motors.h"
+#include "bluetooth.h" // <--- NEU
 
 // ===== PID-Variablen =====
 float lastError = 0;
@@ -27,21 +28,23 @@ unsigned long greenDetectionTime = 0;
 
 // ===== Funktions-Deklarationen =====
 void followLine();
-void processSerialCommands();
+void checkInputSources();      // <--- NEU
+void executeCommand(char cmd); // <--- NEU
 void printHelp();
 void printStatus();
 
 void setup() {
-    Serial.begin(115200);
+    Serial.begin(9600);
     
     // Willkommens-Nachricht
     Serial.println("\n\n======================================");
-    Serial.println("  LINIENFOLGER - NEMA 17 & QTR-MD-08A");
+    Serial.println("  LINIENFOLGER - USB & BLUETOOTH");
     Serial.println("======================================\n");
     
     // Hardware initialisieren
     initSensors();
     initMotors();
+    bt.init(); // <--- NEU: Bluetooth starten
     
     Serial.println("\nInitialisierung abgeschlossen!");
     Serial.println("\n--- BEDIENUNG ---");
@@ -53,8 +56,8 @@ void setup() {
 }
 
 void loop() {
-    // Serielle Befehle verarbeiten
-    processSerialCommands();
+    // Eingabequellen prüfen (USB und Bluetooth)
+    checkInputSources(); // <--- NEU
     
     // Je nach Modus unterschiedliche Aktionen
     switch(currentMode) {
@@ -76,6 +79,201 @@ void loop() {
         case STOPPED:
         case CALIBRATION:
             stopMotors();
+            break;
+    }
+}
+
+// ===== NEU: Eingabequellen prüfen =====
+void checkInputSources() {
+    char cmd = 0;
+
+    // 1. USB Serial prüfen
+    if (Serial.available() > 0) {
+        cmd = Serial.read();
+        while(Serial.available() > 0) Serial.read(); // Puffer leeren
+    }
+    // 2. Bluetooth prüfen (falls USB nichts gesendet hat)
+    else if (bt.isAvailable()) {
+        cmd = bt.readCommand();
+    }
+
+    if (cmd != 0) {
+        executeCommand(cmd);
+    }
+}
+
+// ===== NEU: Befehle ausführen (vorher processSerialCommands) =====
+void executeCommand(char cmd) {
+    // Feedback senden
+    String feedback = "CMD: ";
+    feedback += cmd;
+    bt.sendMessage(feedback); 
+
+    switch(cmd) {
+        case 'c':
+        case 'C':
+            Serial.println("\n>>> KALIBRIERUNGS-MODUS <<<");
+            bt.sendMessage("Kalibrierung...");
+            currentMode = CALIBRATION;
+            stopMotors();
+            calibrateSensors();
+            currentMode = STOPPED;
+            Serial.println("\nKalibrierung abgeschlossen. Druecke 's' zum Starten.");
+            bt.sendMessage("Fertig. 's' druecken.");
+            break;
+            
+        case 's':
+        case 'S':
+            Serial.println("\n>>> START - Linienfolger aktiv <<<");
+            bt.sendMessage("START");
+            currentMode = RUNNING;
+            lastError = 0;
+            integral = 0;
+            lastTime = millis();
+            enableMotors();
+            break;
+            
+        case 'x':
+        case 'X':
+        case ' ':  // Leertaste stoppt auch
+            Serial.println("\n>>> STOPP <<<");
+            bt.sendMessage("STOPP");
+            currentMode = STOPPED;
+            stopMotors();
+            break;
+            
+        case 'd':
+        case 'D':
+            if (currentMode == DEBUG) {
+                Serial.println("\n>>> Debug-Modus BEENDET <<<");
+                bt.sendMessage("Debug ENDE");
+                currentMode = STOPPED;
+            } else {
+                Serial.println("\n>>> DEBUG-MODUS <<<");
+                bt.sendMessage("Debug START");
+                Serial.println("Sensorwerte werden angezeigt...");
+                currentMode = DEBUG;
+            }
+            break;
+            
+        case 'k':
+        case 'K':
+            Serial.println("\n>>> Kreuzungs-Test <<<");
+            printCrossingDebug();
+            break;
+            
+        case 'm':
+        case 'M':
+            printMotorStatus();
+            printMicrosteppingStatus();
+            break;
+            
+        case 'i':
+        case 'I':
+            printStatus();
+            bt.sendMessage("Status gesendet (siehe USB)");
+            break;
+            
+        case 'e':
+        case 'E':
+            Serial.println("Motoren aktiviert");
+            enableMotors();
+            break;
+            
+        case 'r':
+        case 'R':
+            Serial.println("Motoren deaktiviert");
+            disableMotors();
+            break;
+            
+        case 'h':
+        case 'H':
+        case '?':
+            printHelp();
+            break;
+            
+        case '1':
+            Serial.println("\n>>> Wechsel zu Full Step (1/1) <<<");
+            setMicrostepping(FULL_STEP);
+            break;
+            
+        case '2':
+            Serial.println("\n>>> Wechsel zu Half Step (1/2) <<<");
+            setMicrostepping(HALF_STEP);
+            break;
+            
+        case '4':
+            Serial.println("\n>>> Wechsel zu Quarter Step (1/4) <<<");
+            setMicrostepping(QUARTER_STEP);
+            break;
+            
+        case '8':
+            Serial.println("\n>>> Wechsel zu Eighth Step (1/8) <<<");
+            setMicrostepping(EIGHTH_STEP);
+            break;
+            
+        case '6':
+            Serial.println("\n>>> Wechsel zu Sixteenth Step (1/16) <<<");
+            setMicrostepping(SIXTEENTH_STEP);
+            break;
+            
+        case 'l':
+        case 'L':
+            Serial.println("\n>>> Test: Links abbiegen <<<");
+            bt.sendMessage("Links abbiegen");
+            turnLeft();
+            break;
+            
+        case 'g':
+        case 'G':
+            Serial.println("\n>>> Test: Rechts abbiegen <<<");
+            bt.sendMessage("Rechts abbiegen");
+            turnRight();
+            break;
+            
+        case 'f':
+        case 'F':
+            Serial.println("\n>>> Test: Vorwärts fahren <<<");
+            bt.sendMessage("Vorwaerts");
+            driveForward(500);
+            break;
+            
+        case 't':
+        case 'T':
+            // Vollständiger Analog-Test (wiederhergestellt)
+            Serial.println("\n>>> Analog-Pin Raw-Test <<<");
+            Serial.print("A0: "); Serial.println(analogRead(A0));
+            Serial.print("A1: "); Serial.println(analogRead(A1));
+            Serial.print("A2: "); Serial.println(analogRead(A2));
+            Serial.print("A3: "); Serial.println(analogRead(A3));
+            Serial.print("A4: "); Serial.println(analogRead(A4));
+            Serial.print("A5: "); Serial.println(analogRead(A5));
+            Serial.print("A6: "); Serial.println(analogRead(A6));
+            Serial.print("A7: "); Serial.println(analogRead(A7));
+            Serial.println();
+            break;
+            
+        case 'p':
+        case 'P':
+            Serial.println("\n>>> PID Live-Werte <<<");
+            Serial.println("Position und Korrektur werden angezeigt...");
+            Serial.println("(Fahrzeug über Linie bewegen)");
+            for (int i = 0; i < 10; i++) {
+                int pos = readLinePosition();
+                float err = pos - 3500.0;
+                Serial.print("Pos: ");
+                Serial.print(pos);
+                Serial.print(" | Fehler: ");
+                Serial.print(err);
+                Serial.print(" | Korrektur: ");
+                Serial.println(err * KP);
+                delay(300);
+            }
+            break;
+            
+        default:
+            Serial.println("Unbekannter Befehl. Druecke 'h' fuer Hilfe.");
+            bt.sendMessage("Unbekannter Befehl");
             break;
     }
 }
@@ -158,7 +356,6 @@ void followLine() {
     }
     
     // Fehler berechnen (Abweichung von Mitte)
-    // Position: 0 = ganz links, 3500 = mitte, 7000 = ganz rechts
     float error = position - 3500.0;
     
     // Zeit seit letztem Update
@@ -182,8 +379,6 @@ void followLine() {
     lastError = error;
     
     // ===== Geschwindigkeiten berechnen =====
-    // Positive Korrektur = zu weit rechts → linker Motor schneller
-    // Negative Korrektur = zu weit links → rechter Motor schneller
     float leftSpeed = BASE_SPEED + correction;
     float rightSpeed = BASE_SPEED - correction;
     
@@ -193,7 +388,7 @@ void followLine() {
     setMotorSpeeds(leftSpeed, rightSpeed);
     runMotors();
     
-    // ===== Debug-Ausgabe =====
+    // ===== Debug-Ausgabe (wiederhergestellt) =====
     #if DEBUG_SERIAL
     static unsigned long lastPrint = 0;
     if (millis() - lastPrint > DEBUG_INTERVAL) {
@@ -222,173 +417,6 @@ void followLine() {
         lastPrint = millis();
     }
     #endif
-}
-
-void processSerialCommands() {
-    if (Serial.available() > 0) {
-        char cmd = Serial.read();
-        
-        // Alle weiteren Zeichen verwerfen (z.B. Newline)
-        while(Serial.available() > 0) {
-            Serial.read();
-        }
-        
-        switch(cmd) {
-            case 'c':
-            case 'C':
-                Serial.println("\n>>> KALIBRIERUNGS-MODUS <<<");
-                currentMode = CALIBRATION;
-                stopMotors();
-                calibrateSensors();
-                currentMode = STOPPED;
-                Serial.println("\nKalibrierung abgeschlossen. Druecke 's' zum Starten.");
-                break;
-                
-            case 's':
-            case 'S':
-                Serial.println("\n>>> START - Linienfolger aktiv <<<");
-                currentMode = RUNNING;
-                lastError = 0;
-                integral = 0;
-                lastTime = millis();
-                enableMotors();
-                break;
-                
-            case 'x':
-            case 'X':
-            case ' ':  // Leertaste stoppt auch
-                Serial.println("\n>>> STOPP <<<");
-                currentMode = STOPPED;
-                stopMotors();
-                break;
-                
-            case 'd':
-            case 'D':
-                if (currentMode == DEBUG) {
-                    Serial.println("\n>>> Debug-Modus BEENDET <<<");
-                    currentMode = STOPPED;
-                } else {
-                    Serial.println("\n>>> DEBUG-MODUS <<<");
-                    Serial.println("Sensorwerte werden angezeigt...");
-                    currentMode = DEBUG;
-                }
-                break;
-                
-            case 'k':
-            case 'K':
-                Serial.println("\n>>> Kreuzungs-Test <<<");
-                printCrossingDebug();
-                break;
-                
-            case 'm':
-            case 'M':
-                printMotorStatus();
-                printMicrosteppingStatus();
-                break;
-                
-            case 'i':
-            case 'I':
-                printStatus();
-                break;
-                
-            case 'e':
-            case 'E':
-                Serial.println("Motoren aktiviert");
-                enableMotors();
-                break;
-                
-            case 'r':
-            case 'R':
-                Serial.println("Motoren deaktiviert");
-                disableMotors();
-                break;
-                
-            case 'h':
-            case 'H':
-            case '?':
-                printHelp();
-                break;
-                
-            case '1':
-                Serial.println("\n>>> Wechsel zu Full Step (1/1) <<<");
-                setMicrostepping(FULL_STEP);
-                break;
-                
-            case '2':
-                Serial.println("\n>>> Wechsel zu Half Step (1/2) <<<");
-                setMicrostepping(HALF_STEP);
-                break;
-                
-            case '4':
-                Serial.println("\n>>> Wechsel zu Quarter Step (1/4) <<<");
-                setMicrostepping(QUARTER_STEP);
-                break;
-                
-            case '8':
-                Serial.println("\n>>> Wechsel zu Eighth Step (1/8) <<<");
-                setMicrostepping(EIGHTH_STEP);
-                break;
-                
-            case '6':
-                Serial.println("\n>>> Wechsel zu Sixteenth Step (1/16) <<<");
-                setMicrostepping(SIXTEENTH_STEP);
-                break;
-                
-            case 'l':
-            case 'L':
-                Serial.println("\n>>> Test: Links abbiegen <<<");
-                turnLeft();
-                break;
-                
-            case 'g':
-            case 'G':
-                Serial.println("\n>>> Test: Rechts abbiegen <<<");
-                turnRight();
-                break;
-                
-            case 'f':
-            case 'F':
-                Serial.println("\n>>> Test: Vorwärts fahren <<<");
-                driveForward(500);
-                break;
-                
-            case 't':
-            case 'T':
-                Serial.println("\n>>> Analog-Pin Raw-Test <<<");
-                Serial.print("A0: "); Serial.println(analogRead(A0));
-                Serial.print("A1: "); Serial.println(analogRead(A1));
-                Serial.print("A2: "); Serial.println(analogRead(A2));
-                Serial.print("A3: "); Serial.println(analogRead(A3));
-                Serial.print("A4: "); Serial.println(analogRead(A4));
-                Serial.print("A5: "); Serial.println(analogRead(A5));
-                Serial.print("A6: "); Serial.println(analogRead(A6));
-                Serial.print("A7: "); Serial.println(analogRead(A7));
-                Serial.println();
-                break;
-                
-            case 'p':
-            case 'P':
-                Serial.println("\n>>> PID Live-Werte <<<");
-                Serial.println("Position und Korrektur werden angezeigt...");
-                Serial.println("(Fahrzeug über Linie bewegen)");
-                for (int i = 0; i < 10; i++) {
-                    int pos = readLinePosition();
-                    float err = pos - 3500.0;
-                    Serial.print("Pos: ");
-                    Serial.print(pos);
-                    Serial.print(" | Fehler: ");
-                    Serial.print(err);
-                    Serial.print(" | Korrektur: ");
-                    Serial.println(err * KP);
-                    delay(300);
-                }
-                break;
-                
-            default:
-                Serial.println("Unbekannter Befehl. Druecke 'h' fuer Hilfe.");
-                break;
-        }
-    }
 }
 
 void printHelp() {
@@ -442,7 +470,7 @@ void printStatus() {
     Serial.print(isLineDetected() ? "JA" : "NEIN");
     Serial.println(")");
     
-    // Motor-Info
+    // Motor-Info (wiederhergestellt)
     Serial.println("\nMotor-Konfiguration:");
     Serial.print("  Steps/Rev: ");
     Serial.println(STEPS_PER_REV);
