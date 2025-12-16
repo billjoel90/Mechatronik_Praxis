@@ -7,7 +7,12 @@ AccelStepper motorLeft(AccelStepper::DRIVER, STEP_PIN_L, DIR_PIN_L);
 
 void initMotors() {
     Serial.println("Initialisiere Motoren...");
-    
+
+    // Motor-Richtung invertieren (DIR-Pin umkehren)
+    // Falls Motoren rückwärts laufen wenn sie vorwärts sollen
+    motorRight.setPinsInverted(true, false, false);  // DIR invertiert
+    motorLeft.setPinsInverted(true, false, false);   // DIR invertiert
+
     // Enable-Pin konfigurieren (gemeinsam für beide Motoren)
     pinMode(ENABLE_PIN, OUTPUT);
     digitalWrite(ENABLE_PIN, HIGH);  // Erstmal disabled
