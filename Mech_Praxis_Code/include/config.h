@@ -3,25 +3,25 @@
 
 // ===== NEMA 17 Motor Pins (eure Belegung) =====
 // Rechter Motor
-#define DIR_PIN_R    5
-#define STEP_PIN_R   4
+#define DIR_PIN_R    4
+#define STEP_PIN_R   3
 
 // Linker Motor
-#define DIR_PIN_L    7
-#define STEP_PIN_L   6
+#define DIR_PIN_L    6
+#define STEP_PIN_L   5
 
 // Gemeinsamer Enable Pin
 #define ENABLE_PIN   22
 
 // ===== Microstepping Pins Motor 1 (Rechts) =====
-#define MS1_PIN_1    10
-#define MS2_PIN_1    9
-#define MS3_PIN_1    8
+#define MS1_PIN_1    9
+#define MS2_PIN_1    8
+#define MS3_PIN_1    7
 
 // ===== Microstepping Pins Motor 2 (Links) =====
-#define MS1_PIN_2    13
-#define MS2_PIN_2    12
-#define MS3_PIN_2    11
+#define MS1_PIN_2    12
+#define MS2_PIN_2    11
+#define MS3_PIN_2    10
 
 // ===== QTR-MD-08A Sensor Pins (ANALOG) =====
 // Der QTR-MD-08A wird im Analog-Modus betrieben
@@ -42,7 +42,7 @@
 
 // ===== Linien-Erkennung =====
 #define LINE_THRESHOLD   700   // Schwellwert für schwarze Linie (0-1000, nach Kalibrierung)
-#define SENSOR_SAMPLES   4     // Anzahl Messungen pro Sensor für Mittelwertbildung
+#define SENSOR_SAMPLES        // Anzahl Messungen pro Sensor für Mittelwertbildung
 
 // ===== Kreuzungs-Erkennung =====
 #define GREEN_MIN        100   // Minimaler Wert für grünes Quadrat
@@ -57,14 +57,22 @@
 #define STEPS_PER_REV    200   // Standard NEMA 17: 200 Steps/Revolution (1.8° pro Schritt)
 #define MICROSTEPS       8     // Microstepping: 8 = Achtelschritt (1/8)
 #define MAX_SPEED        2000  // Steps/Sekunde (höher bei 1/8 als bei 1/16)
-#define BASE_SPEED       800   // Basis-Geschwindigkeit für Geradeausfahrt
+#define BASE_SPEED       600   // REDUZIERT: Basis-Geschwindigkeit für stabilere Regelung
 #define TURN_SPEED       400   // Minimale Geschwindigkeit bei Kurven
 #define ACCELERATION     1000  // Steps/Sekunde²
 
-// ===== PID-Parameter (Standardwerte - zum Tunen) =====
-#define KP  0.3     // Proportional - erhöhen für schnellere Reaktion (war 0.15)
-#define KI  0.0     // Integral - erhöhen bei dauerhafter Abweichung
-#define KD  2.0     // Derivative - erhöhen gegen Oszillation (war 1.5)
+// ===== PID-Parameter (OPTIMIERT gegen Überregeln) =====
+// Problem: Auto überregelt und verliert Linie
+// Lösung: KP stark reduzieren, KD erhöhen, BASE_SPEED senken
+#define KP  0.04     // Proportional - STARK REDUZIERT für sanfte Reaktion
+#define KI  0.0      // Integral - bleibt 0 (erst aktivieren wenn nötig)
+#define KD  10.0     // Derivative - ERHÖHT gegen Oszillation und Überregeln
+
+// TUNING-HINWEISE:
+// - Wenn Auto zu langsam reagiert: KP leicht erhöhen (0.05, 0.06...)
+// - Wenn Auto zittert/oszilliert: KD erhöhen (12, 15...)
+// - Wenn Auto bei Geraden abdriftet: KI leicht aktivieren (0.001, 0.002...)
+// - BASE_SPEED kann nach erfolgreicher Abstimmung schrittweise erhöht werden
 
 // ===== Debuging =====
 #define DEBUG_SERIAL     true  // Serial-Debug-Ausgaben

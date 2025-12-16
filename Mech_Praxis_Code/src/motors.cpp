@@ -7,7 +7,12 @@ AccelStepper motorLeft(AccelStepper::DRIVER, STEP_PIN_L, DIR_PIN_L);
 
 void initMotors() {
     Serial.println("Initialisiere Motoren...");
-    
+
+    // Motor-Richtung invertieren (DIR-Pin umkehren)
+    // Falls Motoren rückwärts laufen wenn sie vorwärts sollen
+    motorRight.setPinsInverted(true, false, false);  // DIR invertiert
+    motorLeft.setPinsInverted(true, false, false);   // DIR invertiert
+
     // Enable-Pin konfigurieren (gemeinsam für beide Motoren)
     pinMode(ENABLE_PIN, OUTPUT);
     digitalWrite(ENABLE_PIN, HIGH);  // Erstmal disabled
@@ -126,10 +131,14 @@ void stopMotors() {
     motorRight.stop();
 }
 
-void runMotors() {
-    motorLeft.runSpeed();
-    motorRight.runSpeed();
-}
+/*void motorISR() {
+    // Diese Funktion wird vom Timer 25.000 Mal pro Sekunde aufgerufen
+    // Sie muss so kurz wie möglich sein!
+    if (motorLeft.speed() != 0 || motorRight.speed() != 0) {
+        motorLeft.runSpeed();
+        motorRight.runSpeed();
+    }
+}*/
 
 void printMotorStatus() {
     Serial.println("=== Motor Status ===");
@@ -196,7 +205,7 @@ void driveForward(unsigned long duration_ms) {
     setMotorSpeeds(BASE_SPEED, BASE_SPEED);
     
     while (millis() - startTime < duration_ms) {
-        runMotors();
+        
     }
     
     stopMotors();
@@ -217,7 +226,7 @@ void turnLeft() {
     
     // Dauer für ca. 90° (muss kalibriert werden!)
     while (millis() - startTime < 1200) {  // 800ms für 90° - anpassen!
-        runMotors();
+        
     }
     
     stopMotors();
@@ -240,7 +249,7 @@ void turnRight() {
     
     // Dauer für ca. 90° (muss kalibriert werden!)
     while (millis() - startTime < 1200) {  // 800ms für 90° - anpassen!
-        runMotors();
+       
     }
     
     stopMotors();
