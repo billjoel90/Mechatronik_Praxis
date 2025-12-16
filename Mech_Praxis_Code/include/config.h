@@ -70,4 +70,6 @@
 #define DEBUG_SERIAL     true  // Serial-Debug-Ausgaben
 #define DEBUG_INTERVAL   100   // Debug-Ausgabe alle X ms
 
+// RGB-
+
 #endif
