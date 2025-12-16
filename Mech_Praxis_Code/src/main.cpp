@@ -61,8 +61,7 @@ void setup() {
     
     Serial.println("\nInitialisierung abgeschlossen!");
     Serial.println("\n--- BEDIENUNG ---");
-    Serial.println("Wichtig: Vor dem Starten Schrittmodus wählen und danach prüfen!");
-    Serial.println("MS1, MS2, MS3 Pins für beide Motoren auf HIGH/LOW setzen");
+    Serial.println("Befehle funktionieren über USB UND Bluetooth!");
     printHelp();
     
     currentMode = STOPPED;
@@ -113,6 +112,8 @@ void checkInputSources() {
     if (Serial.available() > 0) {
         cmd = Serial.read();
         while(Serial.available() > 0) Serial.read(); // Puffer leeren
+        Serial.print("[USB] Befehl: ");
+        Serial.println(cmd);
     }
     // 2. Bluetooth prüfen (falls USB nichts gesendet hat)
     else if (bt.isAvailable()) {
@@ -126,28 +127,24 @@ void checkInputSources() {
 
 // ===== Befehle ausführen =====
 void executeCommand(char cmd) {
-    // Feedback senden
-    String feedback = "CMD: ";
-    feedback += cmd;
-    bt.sendMessage(feedback); 
-
     switch(cmd) {
         case 'c':
         case 'C':
             Serial.println("\n>>> KALIBRIERUNGS-MODUS <<<");
-            bt.sendMessage("Kalibrierung...");
+            bt.sendMessage(">>> KALIBRIERUNG <<<");
+            bt.sendMessage("Auto über Linie bewegen...");
             currentMode = CALIBRATION;
             stopMotors();
             calibrateSensors();
             currentMode = STOPPED;
             Serial.println("\nKalibrierung abgeschlossen. Druecke 's' zum Starten.");
-            bt.sendMessage("Fertig. 's' druecken.");
+            bt.sendMessage("Fertig! 's' zum Starten");
             break;
             
         case 's':
         case 'S':
             Serial.println("\n>>> START - Linienfolger aktiv <<<");
-            bt.sendMessage("START");
+            bt.sendMessage(">>> START <<<");
             currentMode = RUNNING;
             lastError = 0;
             integral = 0;
@@ -159,7 +156,7 @@ void executeCommand(char cmd) {
         case 'X':
         case ' ':  // Leertaste stoppt auch
             Serial.println("\n>>> STOPP <<<");
-            bt.sendMessage("STOPP");
+            bt.sendMessage(">>> STOPP <<<");
             currentMode = STOPPED;
             stopMotors();
             break;
@@ -168,13 +165,12 @@ void executeCommand(char cmd) {
         case 'D':
             if (currentMode == DEBUG) {
                 Serial.println("\n>>> Debug-Modus BEENDET <<<");
-                bt.sendMessage("Debug-Modus BEENDET");
+                bt.sendMessage(">>> Debug BEENDET <<<");
                 currentMode = STOPPED;
             } else {
                 Serial.println("\n>>> DEBUG-MODUS <<<");
-                bt.sendMessage("DEBUG-MODUS AKTIV");
-                bt.sendMessage("Sensorwerte werden angezeigt...");
-                Serial.println("Sensorwerte werden angezeigt...");
+                bt.sendMessage(">>> Debug AKTIV <<<");
+                bt.sendMessage("Zeige Sensorwerte...");
                 currentMode = DEBUG;
             }
             break;
@@ -185,14 +181,15 @@ void executeCommand(char cmd) {
             bt.sendMessage("\n>>> KREUZUNGS-TEST <<<");
             printCrossingDebug();
             // Kompakte Info über Bluetooth
-            bt.sendMessage("Aktive Sensoren: " + String(getActiveSensorCount()) + "/" + String(NUM_SENSORS));
-            bt.sendMessage("Gruen Links: " + String(hasGreenMarkerLeft() ? "JA" : "NEIN"));
-            bt.sendMessage("Gruen Rechts: " + String(hasGreenMarkerRight() ? "JA" : "NEIN"));
-            bt.sendMessage("Ist Kreuzung: " + String(isCrossing() ? "JA" : "NEIN"));
+            bt.sendMessage("Aktive: " + String(getActiveSensorCount()) + "/" + String(NUM_SENSORS));
+            bt.sendMessage("Gruen L: " + String(hasGreenMarkerLeft() ? "JA" : "NEIN"));
+            bt.sendMessage("Gruen R: " + String(hasGreenMarkerRight() ? "JA" : "NEIN"));
+            bt.sendMessage("Kreuzung: " + String(isCrossing() ? "JA" : "NEIN"));
             break;
             
         case 'm':
         case 'M':
+            Serial.println("\n>>> Motor-Status <<<");
             printMotorStatus();
             printMicrosteppingStatus();
             // Kompakte Version über Bluetooth
@@ -200,90 +197,106 @@ void executeCommand(char cmd) {
             bt.sendMessage("Links: " + String(motorLeft.speed()) + " steps/s");
             bt.sendMessage("Rechts: " + String(motorRight.speed()) + " steps/s");
             bt.sendMessage("Microstepping: 1/" + String(MICROSTEPS));
-            bt.sendMessage("====================");
             break;
             
         case 'i':
         case 'I':
+            Serial.println("\n>>> System-Status <<<");
             printStatus();
             // Status auch über Bluetooth senden (kompakt)
             bt.sendMessage("\n=== STATUS ===");
-            bt.sendMessage("Modus: " + String(currentMode == RUNNING ? "RUNNING" : currentMode == STOPPED ? "STOPPED" : "DEBUG"));
-            bt.sendMessage("BASE_SPEED: " + String(BASE_SPEED));
-            bt.sendMessage("KP: " + String(KP, 3) + " | KD: " + String(KD, 1));
+            String modeStr = "STOPPED";
+            if (currentMode == RUNNING) modeStr = "RUNNING";
+            else if (currentMode == DEBUG) modeStr = "DEBUG";
+            else if (currentMode == CALIBRATION) modeStr = "CALIB";
+            bt.sendMessage("Modus: " + modeStr);
+            bt.sendMessage("SPEED: " + String(BASE_SPEED));
+            bt.sendMessage("KP:" + String(KP, 2) + " KD:" + String(KD, 1));
             int pos = readLinePosition();
-            bt.sendMessage("Position: " + String(pos) + " | Linie: " + String(isLineDetected() ? "JA" : "NEIN"));
-            bt.sendMessage("==============");
+            bt.sendMessage("Pos: " + String(pos));
+            bt.sendMessage("Linie: " + String(isLineDetected() ? "JA" : "NEIN"));
             break;
             
         case 'e':
         case 'E':
-            Serial.println("Motoren aktiviert");
+            Serial.println(">>> Motoren aktiviert <<<");
+            bt.sendMessage("Motoren AN");
             enableMotors();
             break;
             
         case 'r':
         case 'R':
-            Serial.println("Motoren deaktiviert");
+            Serial.println(">>> Motoren deaktiviert <<<");
+            bt.sendMessage("Motoren AUS");
             disableMotors();
             break;
             
         case 'h':
         case 'H':
         case '?':
+            Serial.println("\n>>> Hilfe-Menü <<<");
             printHelp();
             bt.sendMenu();  // Menü auch über Bluetooth senden
+            bt.sendMessage("Menü gesendet!");
             break;
             
         case '1':
             Serial.println("\n>>> Wechsel zu Full Step (1/1) <<<");
-            bt.sendMessage("Microstepping: Full Step (1/1)");
+            bt.sendMessage(">>> Full Step (1/1) <<<");
             setMicrostepping(FULL_STEP);
+            bt.sendMessage("Modus gesetzt!");
             break;
             
         case '2':
             Serial.println("\n>>> Wechsel zu Half Step (1/2) <<<");
-            bt.sendMessage("Microstepping: Half Step (1/2)");
+            bt.sendMessage(">>> Half Step (1/2) <<<");
             setMicrostepping(HALF_STEP);
+            bt.sendMessage("Modus gesetzt!");
             break;
             
         case '4':
             Serial.println("\n>>> Wechsel zu Quarter Step (1/4) <<<");
-            bt.sendMessage("Microstepping: Quarter Step (1/4)");
+            bt.sendMessage(">>> Quarter Step (1/4) <<<");
             setMicrostepping(QUARTER_STEP);
+            bt.sendMessage("Modus gesetzt!");
             break;
             
         case '8':
             Serial.println("\n>>> Wechsel zu Eighth Step (1/8) <<<");
-            bt.sendMessage("Microstepping: Eighth Step (1/8)");
+            bt.sendMessage(">>> Eighth Step (1/8) <<<");
             setMicrostepping(EIGHTH_STEP);
+            bt.sendMessage("Modus gesetzt!");
             break;
             
         case '6':
             Serial.println("\n>>> Wechsel zu Sixteenth Step (1/16) <<<");
-            bt.sendMessage("Microstepping: Sixteenth Step (1/16)");
+            bt.sendMessage(">>> Sixteenth Step (1/16) <<<");
             setMicrostepping(SIXTEENTH_STEP);
+            bt.sendMessage("Modus gesetzt!");
             break;
             
         case 'l':
         case 'L':
             Serial.println("\n>>> Test: Links abbiegen <<<");
-            bt.sendMessage("Links abbiegen");
+            bt.sendMessage(">>> Links abbiegen <<<");
             turnLeft();
+            bt.sendMessage("Fertig!");
             break;
             
         case 'g':
         case 'G':
             Serial.println("\n>>> Test: Rechts abbiegen <<<");
-            bt.sendMessage("Rechts abbiegen");
+            bt.sendMessage(">>> Rechts abbiegen <<<");
             turnRight();
+            bt.sendMessage("Fertig!");
             break;
             
         case 'f':
         case 'F':
             Serial.println("\n>>> Test: Vorwärts fahren <<<");
-            bt.sendMessage("Vorwaerts");
+            bt.sendMessage(">>> Vorwaerts <<<");
             driveForward(500);
+            bt.sendMessage("Fertig!");
             break;
             
         case 't':
@@ -291,31 +304,30 @@ void executeCommand(char cmd) {
             Serial.println("\n>>> Analog-Pin Raw-Test <<<");
             bt.sendMessage("\n>>> Analog-Test <<<");
             Serial.print("A0: "); Serial.println(analogRead(A0));
-            bt.sendMessage("A0: " + String(analogRead(A0)));
+            bt.sendMessage("A0:" + String(analogRead(A0)));
             Serial.print("A1: "); Serial.println(analogRead(A1));
-            bt.sendMessage("A1: " + String(analogRead(A1)));
+            bt.sendMessage("A1:" + String(analogRead(A1)));
             Serial.print("A2: "); Serial.println(analogRead(A2));
-            bt.sendMessage("A2: " + String(analogRead(A2)));
+            bt.sendMessage("A2:" + String(analogRead(A2)));
             Serial.print("A3: "); Serial.println(analogRead(A3));
-            bt.sendMessage("A3: " + String(analogRead(A3)));
+            bt.sendMessage("A3:" + String(analogRead(A3)));
             Serial.print("A4: "); Serial.println(analogRead(A4));
-            bt.sendMessage("A4: " + String(analogRead(A4)));
+            bt.sendMessage("A4:" + String(analogRead(A4)));
             Serial.print("A5: "); Serial.println(analogRead(A5));
-            bt.sendMessage("A5: " + String(analogRead(A5)));
+            bt.sendMessage("A5:" + String(analogRead(A5)));
             Serial.print("A6: "); Serial.println(analogRead(A6));
-            bt.sendMessage("A6: " + String(analogRead(A6)));
+            bt.sendMessage("A6:" + String(analogRead(A6)));
             Serial.print("A7: "); Serial.println(analogRead(A7));
-            bt.sendMessage("A7: " + String(analogRead(A7)));
+            bt.sendMessage("A7:" + String(analogRead(A7)));
             Serial.println();
             break;
             
         case 'p':
         case 'P':
             Serial.println("\n>>> PID Live-Werte <<<");
-            bt.sendMessage("\n>>> PID Live-Werte <<<");
+            bt.sendMessage("\n>>> PID Live-Test <<<");
             Serial.println("Position und Korrektur werden angezeigt...");
-            bt.sendMessage("Position und Korrektur:");
-            Serial.println("(Fahrzeug über Linie bewegen)");
+            bt.sendMessage("Auto über Linie bewegen...");
             for (int i = 0; i < 10; i++) {
                 int pos = readLinePosition();
                 float err = pos - 3500.0;
@@ -325,21 +337,24 @@ void executeCommand(char cmd) {
                 Serial.print(pos);
                 Serial.print(" | Fehler: ");
                 Serial.print(err);
-                Serial.print(" | Korrektur: ");
+                Serial.print(" | Korr: ");
                 Serial.println(err * KP);
                 
                 // Bluetooth (kompakt)
-                String pidMsg = "P:" + String(pos) + " E:" + String((int)err) + " C:" + String(err * KP, 1);
+                String pidMsg = "P:" + String(pos) + " E:" + String((int)err) + " K:" + String(err * KP, 1);
                 bt.sendMessage(pidMsg);
                 
                 delay(300);
             }
-            bt.sendMessage(">>> PID Test beendet <<<");
+            Serial.println(">>> PID Test beendet <<<");
+            bt.sendMessage(">>> Test beendet <<<");
             break;
             
         default:
-            Serial.println("Unbekannter Befehl. Druecke 'h' fuer Hilfe.");
-            bt.sendMessage("Unbekannter Befehl");
+            Serial.print("Unbekannter Befehl: ");
+            Serial.println(cmd);
+            bt.sendMessage("Unbekannter Befehl!");
+            bt.sendMessage("'h' für Hilfe");
             break;
     }
 }
@@ -501,7 +516,7 @@ void followLine() {
 }
 
 void printHelp() {
-    Serial.println("=== STEUERUNG ===");
+    Serial.println("=== STEUERUNG (USB & Bluetooth) ===");
     Serial.println("c - Kalibrierung starten");
     Serial.println("s - Start (Linienfolger)");
     Serial.println("x - Stopp");

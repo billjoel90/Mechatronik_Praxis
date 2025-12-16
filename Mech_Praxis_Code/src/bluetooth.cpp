@@ -10,14 +10,12 @@ BluetoothManager::BluetoothManager(HardwareSerial* port, long baud) {
 
 void BluetoothManager::init() {
     serialPort->begin(baudRate);
-    // Kurze Wartezeit
     delay(100);
     
-    // Test ob Bluetooth wirklich sendet
     Serial.println("Bluetooth wird initialisiert...");
     serialPort->println("BT READY - Linienfolger v1.0");
-    serialPort->flush();  // WICHTIG: Warten bis alles gesendet wurde
-    delay(100);
+    serialPort->flush();
+    delay(50);
     
     serialPort->println("======================================");
     serialPort->flush();
@@ -38,36 +36,29 @@ char BluetoothManager::readCommand() {
         char c = serialPort->read();
         
         // Debug: Zeige empfangenen Befehl auch auf USB
-        Serial.print("[BT RX] Empfangen: ");
+        Serial.print("[BT] Empfangen: ");
         Serial.println(c);
         
-        // Optional: Puffer leeren wie in deiner main.cpp, 
-        // falls du nur einzelne Zeichen als Befehle willst
+        // Puffer leeren
         while(serialPort->available() > 0) {
             serialPort->read();
         }
         return c;
     }
-    return 0; // Kein Befehl
+    return 0;
 }
 
 void BluetoothManager::sendMessage(String msg) {
-    // Debug: Zeige auf USB was an Bluetooth gesendet wird
-    Serial.print("[BT TX] Sende: ");
-    Serial.println(msg);
-    
     // An Bluetooth senden
     serialPort->println(msg);
-    serialPort->flush();  // WICHTIG: Warten bis wirklich gesendet
-    delay(10);  // Kleine Pause zwischen Nachrichten
+    serialPort->flush();
+    delay(5);
 }
 
 void BluetoothManager::sendMenu() {
-    Serial.println("[BT TX] Sende Menü...");
-    
     serialPort->println("\n=== LINIENFOLGER STEUERUNG ===");
     serialPort->flush();
-    delay(50);
+    delay(20);
     
     serialPort->println("HAUPTBEFEHLE:");
     serialPort->flush();
@@ -79,7 +70,7 @@ void BluetoothManager::sendMenu() {
     serialPort->flush();
     serialPort->println("  h - Hilfe anzeigen");
     serialPort->flush();
-    delay(50);
+    delay(20);
     
     serialPort->println("\nDEBUG & INFO:");
     serialPort->flush();
@@ -95,7 +86,7 @@ void BluetoothManager::sendMenu() {
     serialPort->flush();
     serialPort->println("  m - Motor-Status");
     serialPort->flush();
-    delay(50);
+    delay(20);
     
     serialPort->println("\nMOTOR-STEUERUNG:");
     serialPort->flush();
@@ -109,7 +100,7 @@ void BluetoothManager::sendMenu() {
     serialPort->flush();
     serialPort->println("  f - Vorwaerts fahren (Test)");
     serialPort->flush();
-    delay(50);
+    delay(20);
     
     serialPort->println("\nMICROSTEPPING:");
     serialPort->flush();
@@ -125,6 +116,4 @@ void BluetoothManager::sendMenu() {
     serialPort->flush();
     serialPort->println("===============================\n");
     serialPort->flush();
-    
-    Serial.println("[BT TX] Menü komplett gesendet!");
 }
