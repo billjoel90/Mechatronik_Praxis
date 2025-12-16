@@ -57,14 +57,22 @@
 #define STEPS_PER_REV    200   // Standard NEMA 17: 200 Steps/Revolution (1.8° pro Schritt)
 #define MICROSTEPS       8     // Microstepping: 8 = Achtelschritt (1/8)
 #define MAX_SPEED        2000  // Steps/Sekunde (höher bei 1/8 als bei 1/16)
-#define BASE_SPEED       800   // Basis-Geschwindigkeit für Geradeausfahrt
+#define BASE_SPEED       600   // REDUZIERT: Basis-Geschwindigkeit für stabilere Regelung
 #define TURN_SPEED       400   // Minimale Geschwindigkeit bei Kurven
 #define ACCELERATION     1000  // Steps/Sekunde²
 
-// ===== PID-Parameter (Standardwerte - zum Tunen) =====
-#define KP  0.15     // Proportional - erhöhen für schnellere Reaktion (war 0.15)
-#define KI  0.0     // Integral - erhöhen bei dauerhafter Abweichung
-#define KD  3     // Derivative - erhöhen gegen Oszillation (war 1.5)
+// ===== PID-Parameter (OPTIMIERT gegen Überregeln) =====
+// Problem: Auto überregelt und verliert Linie
+// Lösung: KP stark reduzieren, KD erhöhen, BASE_SPEED senken
+#define KP  0.04     // Proportional - STARK REDUZIERT für sanfte Reaktion
+#define KI  0.0      // Integral - bleibt 0 (erst aktivieren wenn nötig)
+#define KD  10.0     // Derivative - ERHÖHT gegen Oszillation und Überregeln
+
+// TUNING-HINWEISE:
+// - Wenn Auto zu langsam reagiert: KP leicht erhöhen (0.05, 0.06...)
+// - Wenn Auto zittert/oszilliert: KD erhöhen (12, 15...)
+// - Wenn Auto bei Geraden abdriftet: KI leicht aktivieren (0.001, 0.002...)
+// - BASE_SPEED kann nach erfolgreicher Abstimmung schrittweise erhöht werden
 
 // ===== Debuging =====
 #define DEBUG_SERIAL     true  // Serial-Debug-Ausgaben

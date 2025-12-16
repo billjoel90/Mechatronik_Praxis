@@ -16,6 +16,7 @@ public:
     char readCommand();         // Liest ein Zeichen, wenn verfügbar
     void sendMessage(String msg); // Sendet Text an Handy zurück
     bool isAvailable();         // Prüft, ob Daten da sind
+    void sendMenu();            // Sendet Menü über Bluetooth
 };
 
 // Globales Objekt verfügbar machen
