@@ -128,3 +128,4 @@ void BluetoothManager::sendMenu() {
     
     Serial.println("[BT TX] Menü komplett gesendet!");
 }
+ 
