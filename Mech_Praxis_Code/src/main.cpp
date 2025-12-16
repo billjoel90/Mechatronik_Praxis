@@ -40,6 +40,9 @@ void printStatus();
 void setup() {
     Serial.begin(115200);
     
+    // WICHTIG: Warte bis Serial bereit ist
+    delay(500);
+    
     // Willkommens-Nachricht
     Serial.println("\n\n======================================");
     Serial.println("  LINIENFOLGER - USB & BLUETOOTH");
@@ -49,10 +52,17 @@ void setup() {
     // Hardware initialisieren
     initSensors();
     initMotors();
+    
+    // WICHTIG: Nach initMotors() nochmal explizit Microstepping setzen
+    Serial.println("\n>>> Setze Microstepping auf 1/8 <<<");
+    setMicrostepping(EIGHTH_STEP);
+    delay(100);
+    
     // Timer für Motor-Ansteuerung konfigurieren
     // 40 Mikrosekunden = 25 kHz (schnell genug für alle Speeds)
     Timer1.initialize(40); 
     Timer1.attachInterrupt(motorISR);
+    
     bt.init();
     
     // Menü auch über Bluetooth senden
@@ -62,6 +72,8 @@ void setup() {
     Serial.println("\nInitialisierung abgeschlossen!");
     Serial.println("\n--- BEDIENUNG ---");
     Serial.println("Befehle funktionieren über USB UND Bluetooth!");
+    Serial.println("\n>>> AKTUELLER MICROSTEPPING-MODUS <<<");
+    printMicrosteppingStatus();
     printHelp();
     
     currentMode = STOPPED;
@@ -112,8 +124,9 @@ void checkInputSources() {
     if (Serial.available() > 0) {
         cmd = Serial.read();
         while(Serial.available() > 0) Serial.read(); // Puffer leeren
-        Serial.print("[USB] Befehl: ");
-        Serial.println(cmd);
+        Serial.print("[USB] Befehl: '");
+        Serial.print(cmd);
+        Serial.println("'");
     }
     // 2. Bluetooth prüfen (falls USB nichts gesendet hat)
     else if (bt.isAvailable()) {
@@ -240,39 +253,50 @@ void executeCommand(char cmd) {
             bt.sendMessage("Menü gesendet!");
             break;
             
+        // MICROSTEPPING-BEFEHLE - EXPLIZIT
         case '1':
-            Serial.println("\n>>> Wechsel zu Full Step (1/1) <<<");
+            Serial.println("\n>>> WECHSEL zu Full Step (1/1) <<<");
             bt.sendMessage(">>> Full Step (1/1) <<<");
             setMicrostepping(FULL_STEP);
-            bt.sendMessage("Modus gesetzt!");
+            delay(50);
+            printMicrosteppingStatus();
+            bt.sendMessage("Modus gesetzt! (siehe USB)");
             break;
             
         case '2':
-            Serial.println("\n>>> Wechsel zu Half Step (1/2) <<<");
+            Serial.println("\n>>> WECHSEL zu Half Step (1/2) <<<");
             bt.sendMessage(">>> Half Step (1/2) <<<");
             setMicrostepping(HALF_STEP);
-            bt.sendMessage("Modus gesetzt!");
+            delay(50);
+            printMicrosteppingStatus();
+            bt.sendMessage("Modus gesetzt! (siehe USB)");
             break;
             
         case '4':
-            Serial.println("\n>>> Wechsel zu Quarter Step (1/4) <<<");
+            Serial.println("\n>>> WECHSEL zu Quarter Step (1/4) <<<");
             bt.sendMessage(">>> Quarter Step (1/4) <<<");
             setMicrostepping(QUARTER_STEP);
-            bt.sendMessage("Modus gesetzt!");
+            delay(50);
+            printMicrosteppingStatus();
+            bt.sendMessage("Modus gesetzt! (siehe USB)");
             break;
             
         case '8':
-            Serial.println("\n>>> Wechsel zu Eighth Step (1/8) <<<");
+            Serial.println("\n>>> WECHSEL zu Eighth Step (1/8) <<<");
             bt.sendMessage(">>> Eighth Step (1/8) <<<");
             setMicrostepping(EIGHTH_STEP);
-            bt.sendMessage("Modus gesetzt!");
+            delay(50);
+            printMicrosteppingStatus();
+            bt.sendMessage("Modus gesetzt! (siehe USB)");
             break;
             
         case '6':
-            Serial.println("\n>>> Wechsel zu Sixteenth Step (1/16) <<<");
+            Serial.println("\n>>> WECHSEL zu Sixteenth Step (1/16) <<<");
             bt.sendMessage(">>> Sixteenth Step (1/16) <<<");
             setMicrostepping(SIXTEENTH_STEP);
-            bt.sendMessage("Modus gesetzt!");
+            delay(50);
+            printMicrosteppingStatus();
+            bt.sendMessage("Modus gesetzt! (siehe USB)");
             break;
             
         case 'l':
@@ -351,8 +375,11 @@ void executeCommand(char cmd) {
             break;
             
         default:
-            Serial.print("Unbekannter Befehl: ");
-            Serial.println(cmd);
+            Serial.print("Unbekannter Befehl: '");
+            Serial.print(cmd);
+            Serial.print("' (ASCII: ");
+            Serial.print((int)cmd);
+            Serial.println(")");
             bt.sendMessage("Unbekannter Befehl!");
             bt.sendMessage("'h' für Hilfe");
             break;
@@ -527,7 +554,7 @@ void printHelp() {
     Serial.println("m - Motor-Status anzeigen");
     Serial.println("i - Gesamt-Status");
     Serial.println("e - Motoren aktivieren");
-    Serial.println("r - Motoren deaktivieren");
+    Serial.println("r - Motoren deaktiviert");
     Serial.println("h - Hilfe anzeigen");
     Serial.println("\n=== MICROSTEPPING ===");
     Serial.println("1 - Full Step (1/1)");

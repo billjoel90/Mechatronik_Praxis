@@ -3,25 +3,25 @@
 
 // ===== NEMA 17 Motor Pins (eure Belegung) =====
 // Rechter Motor
-#define DIR_PIN_R    5
-#define STEP_PIN_R   4
+#define DIR_PIN_R    4
+#define STEP_PIN_R   3
 
 // Linker Motor
-#define DIR_PIN_L    7
-#define STEP_PIN_L   6
+#define DIR_PIN_L    6
+#define STEP_PIN_L   5
 
 // Gemeinsamer Enable Pin
 #define ENABLE_PIN   22
 
 // ===== Microstepping Pins Motor 1 (Rechts) =====
-#define MS1_PIN_1    10
-#define MS2_PIN_1    9
-#define MS3_PIN_1    8
+#define MS1_PIN_1    9
+#define MS2_PIN_1    8
+#define MS3_PIN_1    7
 
 // ===== Microstepping Pins Motor 2 (Links) =====
-#define MS1_PIN_2    13
-#define MS2_PIN_2    12
-#define MS3_PIN_2    11
+#define MS1_PIN_2    12
+#define MS2_PIN_2    11
+#define MS3_PIN_2    10
 
 // ===== QTR-MD-08A Sensor Pins (ANALOG) =====
 // Der QTR-MD-08A wird im Analog-Modus betrieben
